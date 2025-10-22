@@ -274,18 +274,19 @@ export default function ProductDetails() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="pt-32 pb-16 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading product...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Removed loading state - product page will load without showing loading spinner
+  // if (isLoading) {
+  //   return (
+  //     <div className="min-h-screen bg-white">
+  //       <div className="pt-32 pb-16 px-4">
+  //         <div className="max-w-4xl mx-auto text-center">
+  //           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+  //           <p className="text-gray-600">Loading product...</p>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   if (!product) {
     return (

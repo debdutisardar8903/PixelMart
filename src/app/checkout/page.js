@@ -40,6 +40,11 @@ function CheckoutForm() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [discount, setDiscount] = useState(0);
   const [showCoupons, setShowCoupons] = useState(false);
+  
+  // Address functionality
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [showAddresses, setShowAddresses] = useState(false);
 
   // Redirect if not logged in or no items in cart (only after auth loading is complete)
   useEffect(() => {
@@ -133,6 +138,50 @@ function CheckoutForm() {
     fetchCustomerDetails();
   }, [user]);
 
+  // Fetch saved addresses from userAddresses database (same logic as address page)
+  useEffect(() => {
+    const fetchSavedAddresses = async () => {
+      if (user?.uid) {
+        try {
+          // Fetch addresses from userAddresses collection
+          const addressesRef = ref(database, `userAddresses/${user.uid}`);
+          const snapshot = await get(addressesRef);
+          
+          if (snapshot.exists()) {
+            const addressesData = snapshot.val();
+            // Convert object to array and sort by creation date
+            const addressesArray = Object.keys(addressesData).map(key => ({
+              id: key,
+              ...addressesData[key]
+            })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            setSavedAddresses(addressesArray);
+            
+            // Auto-select default address if available
+            const defaultAddress = addressesArray.find(addr => addr.isDefault);
+            if (defaultAddress) {
+              setSelectedAddress(defaultAddress);
+              // Pre-fill customer details with default address
+              setCustomerDetails(prev => ({
+                ...prev,
+                name: defaultAddress.name,
+                email: defaultAddress.email,
+                phone: defaultAddress.phone
+              }));
+            }
+          } else {
+            setSavedAddresses([]);
+          }
+        } catch (error) {
+          console.error('Error fetching saved addresses:', error);
+          setSavedAddresses([]);
+        }
+      }
+    };
+
+    fetchSavedAddresses();
+  }, [user]);
+
   // Note: Removed automatic coupon loading - users must manually apply coupons
 
   // Coupon functions
@@ -148,6 +197,27 @@ function CheckoutForm() {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setDiscount(0);
+  };
+
+  // Address functions
+  const handleSelectAddress = (address) => {
+    setSelectedAddress(address);
+    setCustomerDetails({
+      name: address.name,
+      email: address.email,
+      phone: address.phone
+    });
+    setShowAddresses(false);
+  };
+
+  const handleUseNewAddress = () => {
+    setSelectedAddress(null);
+    setCustomerDetails({
+      name: '',
+      email: user?.email || '',
+      phone: ''
+    });
+    setShowAddresses(false);
   };
 
   // Calculate totals with safety checks
@@ -253,6 +323,30 @@ function CheckoutForm() {
             ...userData,
             createdAt: currentTime
           });
+        }
+      }
+
+      // Save address to userAddresses if it's a new address (same logic as address page)
+      if (!selectedAddress) {
+        try {
+          const addressesRef = ref(database, `userAddresses/${user.uid}`);
+          const newAddressRef = push(addressesRef);
+          
+          const newAddress = {
+            id: newAddressRef.key,
+            name: customerDetails.name,
+            email: customerDetails.email,
+            phone: customerDetails.phone,
+            userId: user.uid,
+            isDefault: savedAddresses.length === 0, // First address becomes default
+            createdAt: new Date().toISOString()
+          };
+          
+          await set(newAddressRef, newAddress);
+          console.log('New address saved to userAddresses');
+        } catch (error) {
+          console.error('Error saving address to userAddresses:', error);
+          // Don't fail the payment if address saving fails
         }
       }
 
@@ -385,75 +479,152 @@ function CheckoutForm() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Customer Details</h2>
             
-            <form onSubmit={handlePayNow} className="space-y-6">
-              {/* Customer Name */}
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={customerDetails.name}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.name ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter your full name"
-                />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                )}
-              </div>
-
-              {/* Email */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={customerDetails.email}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter your email address"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
-              </div>
-
-              {/* Phone Number */}
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
-                </label>
-                <div className="flex">
-                  <div className="flex items-center px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg">
-                    <span className="text-gray-700 font-medium">+91</span>
-                  </div>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={customerDetails.phone}
-                    onChange={handleInputChange}
-                    maxLength="10"
-                    className={`flex-1 px-4 py-3 border rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.phone ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter 10-digit phone number"
-                  />
+            {/* Saved Addresses Section */}
+            {savedAddresses.length > 0 && (
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Billing Address</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddresses(!showAddresses)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    {selectedAddress ? 'Change Address' : 'Select Address'}
+                  </button>
                 </div>
-                {errors.phone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                
+                {selectedAddress && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{selectedAddress.name}</h4>
+                        <p className="text-sm text-gray-600">Phone: {selectedAddress.phone}</p>
+                        <p className="text-sm text-gray-600">Email: {selectedAddress.email}</p>
+                      </div>
+                      {selectedAddress.isDefault && (
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {showAddresses && (
+                  <div className="border border-gray-200 rounded-lg p-4 mb-4 max-h-60 overflow-y-auto">
+                    <div className="space-y-3">
+                      {savedAddresses.map((address) => (
+                        <div
+                          key={address.id}
+                          onClick={() => handleSelectAddress(address)}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedAddress?.id === address.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-medium text-gray-900">{address.name}</h4>
+                              <p className="text-sm text-gray-600">Phone: {address.phone}</p>
+                              <p className="text-sm text-gray-600">Email: {address.email}</p>
+                            </div>
+                            {address.isDefault && (
+                              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        type="button"
+                        onClick={handleUseNewAddress}
+                        className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+                      >
+                        + Use New Address
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
+            
+            <form onSubmit={handlePayNow} className="space-y-6">
+              {/* Customer Details Form - Only show when no address is selected or user chose "Use New Address" */}
+              {!selectedAddress && (
+                <>
+                  {/* Customer Name */}
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      value={customerDetails.name}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter your full name"
+                    />
+                    {errors.name && (
+                      <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                    )}
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={customerDetails.email}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter your email address"
+                    />
+                    {errors.email && (
+                      <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                    )}
+                  </div>
+
+                  {/* Phone Number */}
+                  <div>
+                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number *
+                    </label>
+                    <div className="flex">
+                      <div className="flex items-center px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg">
+                        <span className="text-gray-700 font-medium">+91</span>
+                      </div>
+                      <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value={customerDetails.phone}
+                        onChange={handleInputChange}
+                        maxLength="10"
+                        className={`flex-1 px-4 py-3 border rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          errors.phone ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="Enter 10-digit phone number"
+                      />
+                    </div>
+                    {errors.phone && (
+                      <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Terms and Conditions Checkbox */}
               <div className="space-y-2">

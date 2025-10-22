@@ -11,8 +11,17 @@ export default function Home() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        // Start with a shorter loading state
         setIsLoading(true);
-        const fetchedProducts = await getAllProducts();
+        
+        // Fetch products with timeout for faster perceived loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Loading timeout')), 8000) // 8 second timeout
+        );
+        
+        const fetchPromise = getAllProducts();
+        
+        const fetchedProducts = await Promise.race([fetchPromise, timeoutPromise]);
         
         // Transform database products to match ProductGrid interface
         const transformedProducts = fetchedProducts.map(product => ({
@@ -31,42 +40,110 @@ export default function Home() {
         console.error('Error fetching products:', error);
         setProducts([]); // Set empty array on error
       } finally {
-        setIsLoading(false);
+        // Add minimum loading time to prevent flashing
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500); // Minimum 500ms loading for smooth UX
       }
     };
 
     fetchProducts();
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="font-sans">
-        <section className="pt-24 px-4">
-          <div className="mx-auto max-w-6xl">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading products...</p>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-  }
+  // Removed loading state - home page will load without showing loading content
+  // if (isLoading) {
+  //   return (
+  //     <div className="font-sans">
+  //       {/* Video Banner */}
+  //       <section className="pt-24 px-4">
+  //         <div className="mx-auto max-w-6xl">
+  //           {/* Desktop Video Banner - Hidden on mobile */}
+  //           <video
+  //             className="hidden sm:block w-full h-48 sm:h-56 md:h-64 object-cover rounded-lg"
+  //             autoPlay
+  //             muted
+  //             loop
+  //             playsInline
+  //           >
+  //             <source
+  //               src="https://pixelmart-storage.s3.ap-south-1.amazonaws.com/pixelmart/products/video+banner.mp4"
+  //               type="video/mp4"
+  //             />
+  //             Your browser does not support the video tag.
+  //           </video>
+  //
+  //           {/* Mobile Video Banner - Visible only on mobile */}
+  //           <video
+  //             className="block sm:hidden w-full h-48 object-cover rounded-lg"
+  //             autoPlay
+  //             muted
+  //             loop
+  //             playsInline
+  //           >
+  //             <source
+  //               src="https://pixelmart-storage.s3.ap-south-1.amazonaws.com/pixelmart/products/video+banner.mp4"
+  //               type="video/mp4"
+  //             />
+  //             Your browser does not support the video tag.
+  //           </video>
+  //         </div>
+  //       </section>
+  //
+  //       {/* Telegram Channel Note */}
+  //       <section className="px-4 mt-8">
+  //         <div className="mx-auto max-w-6xl">
+  //           <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+  //             <div className="flex items-center gap-2 text-left">
+  //               <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+  //                 i
+  //               </div>
+  //               <p className="text-sm/6 tracking-[-.01em]">
+  //                 <span className="text-red-600">Join our telegram Channel,</span>
+  //                 <span className="text-blue-800"> for Latest and Important Tool Updates and News only….  </span>
+  //                 <span 
+  //                   className="text-blue-600 hover:text-blue-800 cursor-pointer hover:underline transition-colors duration-200"
+  //                   onClick={() => window.open('https://t.me/wallineex', '_blank')}
+  //                 >
+  //                   Click here to Join
+  //                 </span>
+  //               </p>
+  //             </div>
+  //           </div>
+  //         </section>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="font-sans">
       {/* Video Banner */}
       <section className="pt-24 px-4">
         <div className="mx-auto max-w-6xl">
+          {/* Desktop Video Banner - Hidden on mobile */}
           <video
-            className="w-full h-48 sm:h-56 md:h-64 object-cover rounded-lg"
+            className="hidden sm:block w-full h-48 sm:h-56 md:h-64 object-cover rounded-lg"
             autoPlay
             muted
             loop
             playsInline
           >
             <source
-              src="https://pixelmart-storage.s3.ap-south-1.amazonaws.com/pixelmart/products/birthday!-Picwand.mp4"
+              src="https://pixelmart-storage.s3.ap-south-1.amazonaws.com/pixelmart/products/video+banner.mp4"
+              type="video/mp4"
+            />
+            Your browser does not support the video tag.
+          </video>
+
+          {/* Mobile Video Banner - Visible only on mobile */}
+          <video
+            className="block sm:hidden w-full h-48 object-cover rounded-lg"
+            autoPlay
+            muted
+            loop
+            playsInline
+          >
+            <source
+              src="https://pixelmart-storage.s3.ap-south-1.amazonaws.com/pixelmart/products/video+banner.mp4"
               type="video/mp4"
             />
             Your browser does not support the video tag.

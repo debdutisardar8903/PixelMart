@@ -3,12 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { database } from '@/lib/firebase';
+import { ref, get, set, push } from 'firebase/database';
+import { 
+  validateEmail,
+  validatePhoneNumber
+} from '@/lib/payment';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 export default function AddressPage() {
-  const { user } = useAuth() || { user: null };
+  const { user, loading } = useAuth() || { user: null, loading: true };
   const router = useRouter();
   
   const [addresses, setAddresses] = useState([]);
@@ -23,27 +29,106 @@ export default function AddressPage() {
 
   // Redirect if not logged in
   useEffect(() => {
+    // Wait for authentication to load before checking user
+    if (loading) {
+      return;
+    }
+    
     if (!user) {
       router.push('/auth');
       return;
     }
-    
-    // Pre-fill user email when form is shown
-    if (user.email) {
-      setFormData(prev => ({
-        ...prev,
-        email: user.email
-      }));
-    }
-  }, [user, router]);
+  }, [user, router, loading]);
+
+  // Fetch and pre-fill customer details from database (same logic as checkout)
+  useEffect(() => {
+    const fetchCustomerDetails = async () => {
+      if (user?.uid) {
+        try {
+          // Fetch user data from database
+          const userRef = ref(database, `users/${user.uid}`);
+          const snapshot = await get(userRef);
+          
+          if (snapshot.exists()) {
+            const userData = snapshot.val();
+            setFormData(prev => ({
+              ...prev,
+              name: userData.fullName || userData.displayName || '',
+              email: userData.email || user.email || '',
+              phone: userData.phone || ''
+            }));
+          } else {
+            // If no user data exists, just pre-fill email
+            setFormData(prev => ({
+              ...prev,
+              email: user.email || ''
+            }));
+          }
+        } catch (error) {
+          console.error('Error fetching customer details:', error);
+          // Fallback to just email
+          setFormData(prev => ({
+            ...prev,
+            email: user.email || ''
+          }));
+        }
+      }
+    };
+
+    fetchCustomerDetails();
+  }, [user]);
+
+  // Fetch saved addresses from database
+  useEffect(() => {
+    const fetchSavedAddresses = async () => {
+      if (user?.uid) {
+        try {
+          // Fetch addresses from userAddresses collection
+          const addressesRef = ref(database, `userAddresses/${user.uid}`);
+          const snapshot = await get(addressesRef);
+          
+          if (snapshot.exists()) {
+            const addressesData = snapshot.val();
+            // Convert object to array and sort by creation date
+            const addressesArray = Object.keys(addressesData).map(key => ({
+              id: key,
+              ...addressesData[key]
+            })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            setAddresses(addressesArray);
+          } else {
+            setAddresses([]);
+          }
+        } catch (error) {
+          console.error('Error fetching saved addresses:', error);
+          setAddresses([]);
+        }
+      }
+    };
+
+    fetchSavedAddresses();
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
     
+    // Handle phone number formatting (same as checkout)
+    if (name === 'phone') {
+      // Remove all non-digits
+      const digits = value.replace(/\D/g, '');
+      // Limit to 10 digits after +91
+      const phoneDigits = digits.slice(0, 10);
+      setFormData(prev => ({
+        ...prev,
+        [name]: phoneDigits
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -55,23 +140,23 @@ export default function AddressPage() {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
-    
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (formData.phone.length !== 10) {
-      newErrors.phone = 'Phone number must be 10 digits';
-    }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Email is invalid';
     }
-    
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!validatePhoneNumber(formData.phone)) {
+      newErrors.phone = 'Phone number must be a valid Indian number (10 digits starting with 6-9)';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -86,28 +171,66 @@ export default function AddressPage() {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Save/update customer details in users database (same logic as checkout)
+      if (user?.uid) {
+        const userRef = ref(database, `users/${user.uid}`);
+        const userSnapshot = await get(userRef);
+        
+        const currentTime = new Date().toISOString();
+        const userData = {
+          uid: user.uid,
+          email: formData.email,
+          displayName: formData.name,
+          fullName: formData.name,
+          phone: formData.phone,
+          updatedAt: currentTime
+        };
+
+        if (userSnapshot.exists()) {
+          // Update existing user data
+          const existingData = userSnapshot.val();
+          await set(userRef, {
+            ...existingData,
+            ...userData
+          });
+        } else {
+          // Create new user data
+          await set(userRef, {
+            ...userData,
+            createdAt: currentTime
+          });
+        }
+      }
+      
+      // Save address to Firebase database
+      const addressesRef = ref(database, `userAddresses/${user.uid}`);
+      const newAddressRef = push(addressesRef);
       
       const newAddress = {
-        id: Date.now(),
+        id: newAddressRef.key,
         ...formData,
-        isDefault: addresses.length === 0 // First address becomes default
+        userId: user.uid,
+        isDefault: addresses.length === 0, // First address becomes default
+        createdAt: new Date().toISOString()
       };
       
+      await set(newAddressRef, newAddress);
+      
+      // Update local state
       setAddresses(prev => [...prev, newAddress]);
       
-      // Reset form
+      // Reset form but keep user data for next time
       setFormData({
-        name: '',
-        phone: '',
-        email: user?.email || ''
+        name: formData.name, // Keep name
+        phone: formData.phone, // Keep phone
+        email: formData.email // Keep email
       });
       
       setShowAddForm(false);
       alert('Billing address added successfully!');
       
     } catch (error) {
+      console.error('Error saving address:', error);
       alert('Failed to add address. Please try again.');
     } finally {
       setIsLoading(false);
@@ -124,7 +247,8 @@ export default function AddressPage() {
     setErrors({});
   };
 
-  if (!user) {
+  // Show loading state while authentication is loading or user is not available
+  if (loading || !user) {
     return (
       <div className="font-sans min-h-screen bg-white pt-24 flex items-center justify-center">
         <div className="text-center">
@@ -239,18 +363,23 @@ export default function AddressPage() {
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.phone ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter 10-digit phone number"
-                  maxLength="10"
-                />
+                <div className="flex">
+                  <div className="flex items-center px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg">
+                    <span className="text-gray-700 font-medium">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    maxLength="10"
+                    className={`flex-1 px-4 py-3 border rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter 10-digit phone number"
+                  />
+                </div>
                 {errors.phone && (
                   <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
                 )}

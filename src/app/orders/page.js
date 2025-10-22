@@ -11,7 +11,7 @@ import { database, auth } from '@/lib/firebase';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 
 export default function OrdersPage() {
-  const { user } = useAuth() || { user: null };
+  const { user, loading } = useAuth() || { user: null, loading: true };
   const router = useRouter();
   
   const [orders, setOrders] = useState([]);
@@ -20,6 +20,11 @@ export default function OrdersPage() {
 
   // Redirect if not logged in
   useEffect(() => {
+    // Wait for authentication to load before checking user
+    if (loading) {
+      return;
+    }
+    
     if (!user) {
       router.push('/auth');
       return;
@@ -131,7 +136,7 @@ export default function OrdersPage() {
     };
     
     loadOrders();
-  }, [user, router]);
+  }, [user, router, loading]);
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -215,7 +220,8 @@ export default function OrdersPage() {
     }
   };
 
-  if (!user) {
+  // Show loading state while authentication is loading or user is not available
+  if (loading || !user) {
     return (
       <div className="font-sans min-h-screen bg-white pt-24 flex items-center justify-center">
         <div className="text-center">
@@ -226,18 +232,19 @@ export default function OrdersPage() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="font-sans min-h-screen bg-white pt-24">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your orders...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Removed loading state - orders will load without showing loading spinner
+  // if (isLoading) {
+  //   return (
+  //     <div className="font-sans min-h-screen bg-white pt-24">
+  //       <div className="max-w-4xl mx-auto px-4 py-8">
+  //         <div className="text-center py-12">
+  //           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+  //           <p className="text-gray-600">Loading your orders...</p>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="font-sans min-h-screen bg-white pt-24">
@@ -299,7 +306,10 @@ export default function OrdersPage() {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                        <h4 
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer truncate transition-colors duration-200"
+                          onClick={() => router.push(`/product/${item.id}`)}
+                        >
                           {item.name}
                         </h4>
                         <p className="text-sm text-gray-600">
@@ -350,7 +360,14 @@ export default function OrdersPage() {
 
                 {/* Order Actions */}
                 <div className="mt-6 pt-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
-                  <button className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                  <button 
+                    onClick={() => {
+                      if (order.items && order.items.length > 0) {
+                        router.push(`/product/${order.items[0].id}`);
+                      }
+                    }}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                  >
                     View Details
                   </button>
                   {order.status.toLowerCase() === 'delivered' && (

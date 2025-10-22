@@ -172,6 +172,30 @@
           }
         }
       }
+    },
+    "userAddresses": {
+      "$uid": {
+        ".read": "$uid === auth.uid || (auth != null && auth.token.email === 'admin.743245da@gmail.com')",
+        ".write": "$uid === auth.uid || (auth != null && auth.token.email === 'admin.743245da@gmail.com')",
+        "$addressId": {
+          ".validate": "newData.hasChildren(['id', 'userId', 'name', 'email', 'phone', 'createdAt']) && newData.child('userId').val() === auth.uid && newData.child('name').isString() && newData.child('email').isString() && newData.child('phone').isString() && newData.child('createdAt').isString()",
+          "isDefault": {
+            ".validate": "newData.isBoolean() || newData.val() == null"
+          }
+        }
+      }
+    },
+    "wishlists": {
+      "$uid": {
+        ".read": "$uid === auth.uid || (auth != null && auth.token.email === 'admin.743245da@gmail.com')",
+        ".write": "$uid === auth.uid || (auth != null && auth.token.email === 'admin.743245da@gmail.com')",
+        "$itemId": {
+          ".validate": "newData.hasChildren(['id', 'userId', 'productId', 'name', 'price', 'image', 'addedAt']) && newData.child('userId').val() === auth.uid && newData.child('name').isString() && newData.child('price').isNumber() && newData.child('image').isString() && newData.child('addedAt').isString()",
+          "originalPrice": {
+            ".validate": "newData.isNumber() || newData.val() == null"
+          }
+        }
+      }
     }
   }
 }

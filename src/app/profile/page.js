@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth() || { user: null, logout: () => {} };
+  const { user, logout, loading } = useAuth() || { user: null, logout: () => {}, loading: true };
   const router = useRouter();
   
   const [activeTab, setActiveTab] = useState('orders');
@@ -27,6 +27,11 @@ export default function ProfilePage() {
 
   // Redirect if not logged in
   useEffect(() => {
+    // Wait for authentication to load before checking user
+    if (loading) {
+      return;
+    }
+    
     if (!user) {
       router.push('/auth');
       return;
@@ -39,7 +44,7 @@ export default function ProfilePage() {
         lastName: user.lastName || ''
       });
     }
-  }, [user, router]);
+  }, [user, router, loading]);
 
   const handleAccountDetailsChange = (e) => {
     const { name, value } = e.target;
@@ -108,7 +113,8 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (!user) {
+  // Show loading state while authentication is loading or user is not available
+  if (loading || !user) {
     return (
       <div className="font-sans min-h-screen bg-white pt-24 flex items-center justify-center">
         <div className="text-center">

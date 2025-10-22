@@ -3,25 +3,43 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { useCart } from '@/contexts/CartContext';
 
 export default function WishlistPage() {
   const { wishlistItems, removeFromWishlist, clearWishlist, wishlistCount } = useWishlist();
   const { addToCart } = useCart();
+  const router = useRouter();
 
-  const handleMoveToCart = (item) => {
+  const handleMoveToCart = async (item) => {
     const cartItem = {
-      id: item.id,
+      id: item.productId || item.id, // Use productId if available, fallback to id
+      productId: item.productId || item.id, // Add productId for database compatibility
       name: item.name,
+      title: item.name, // Add title for database compatibility
       price: item.price,
       image: item.image,
       quantity: 1,
-      originalPrice: item.originalPrice
+      originalPrice: item.originalPrice,
+      // Add additional fields that might be needed by database
+      category: 'digital', // Default category, will be updated from database
+      downloadSize: 'Unknown', // Will be updated from database
+      fileFormat: 'Digital', // Will be updated from database
+      description: item.name // Will be updated from database
     };
 
-    addToCart(cartItem);
-    removeFromWishlist(item.id);
+    try {
+      await addToCart(cartItem);
+      removeFromWishlist(item.id);
+      
+      // Navigate to cart page after successful addition
+      router.push('/cart');
+    } catch (error) {
+      console.error('Error moving item to cart:', error);
+      // Still remove from wishlist even if cart addition fails
+      removeFromWishlist(item.id);
+    }
   };
 
   const renderStars = (rating) => {

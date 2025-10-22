@@ -92,20 +92,21 @@ export default function ProductsPage() {
     }
   });
 
-  if (isLoading) {
-    return (
-      <div className="font-sans">
-        <section className="pt-24 px-4">
-          <div className="mx-auto max-w-6xl">
-            <div className="text-center py-12">
-              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading products...</p>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-  }
+  // Removed loading state - products will load without showing loading spinner
+  // if (isLoading) {
+  //   return (
+  //     <div className="font-sans">
+  //       <section className="pt-24 px-4">
+  //         <div className="mx-auto max-w-6xl">
+  //           <div className="text-center py-12">
+  //             <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+  //             <p className="text-gray-600">Loading products...</p>
+  //           </div>
+  //         </div>
+  //       </section>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="font-sans">

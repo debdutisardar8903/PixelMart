@@ -33,6 +33,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
     
     const wishlistItem = {
       id: product.id.toString(),
+      productId: product.id.toString(), // Add productId for database compatibility
       name: product.name,
       price: product.price,
       image: product.image,
@@ -52,11 +53,18 @@ export default function ProductGrid({ products }: ProductGridProps) {
     
     const cartItem = {
       id: product.id.toString(),
+      productId: product.id.toString(), // Add productId for database compatibility
       name: product.name,
+      title: product.name, // Add title for database compatibility
       price: product.price,
       image: product.image,
       quantity: 1,
-      originalPrice: product.originalPrice
+      originalPrice: product.originalPrice,
+      // Add additional fields that might be needed by database
+      category: 'digital', // Default category, will be updated from database
+      downloadSize: 'Unknown', // Will be updated from database
+      fileFormat: 'Digital', // Will be updated from database
+      description: product.name // Will be updated from database
     };
 
     addToCart(cartItem);
@@ -197,7 +205,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
       ))}
       
       {/* Load More Button */}
-      <div className="col-span-full flex justify-center mt-4 sm:mt-8">
+      <div className="col-span-full flex justify-center mt-4 sm:mt-8 mb-28 sm:mb-8">
         <ClientOnly>
           <button 
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"

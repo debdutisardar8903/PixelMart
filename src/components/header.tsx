@@ -127,37 +127,37 @@ export default function Header() {
                 onMouseLeave={() => setIsCategoriesMenuOpen(false)}
               >
                 <Link 
-                  href="/categories/ebooks" 
+                  href="/ebooks" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   eBooks
                 </Link>
                 <Link 
-                  href="/categories/courses" 
+                  href="/courses" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   Courses
                 </Link>
                 <Link 
-                  href="/categories/templates" 
+                  href="/templates" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   Templates
                 </Link>
                 <Link 
-                  href="/categories/digital-tools" 
+                  href="/digital-tools" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   Digital Tools
                 </Link>
                 <Link 
-                  href="/categories/music-audio" 
+                  href="/music-audio" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   Music & Audio
                 </Link>
                 <Link 
-                  href="/categories/graphics-design" 
+                  href="/graphics-design" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                 >
                   Graphics & Design

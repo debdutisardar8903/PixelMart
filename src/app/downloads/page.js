@@ -3,117 +3,131 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { database, auth } from '@/lib/firebase';
+import { ref, get } from 'firebase/database';
 
 export default function DownloadsPage() {
-  const { user } = useAuth() || { user: null };
+  const { user, loading } = useAuth() || { user: null, loading: true };
   const router = useRouter();
   
   const [downloads, setDownloads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingItems, setDownloadingItems] = useState(new Set());
 
-  // Redirect if not logged in
+  // Fetch purchased digital products from Firebase
   useEffect(() => {
+    // Wait for authentication to load before checking user
+    if (loading) {
+      return;
+    }
+    
     if (!user) {
       router.push('/auth');
       return;
     }
     
-    // Simulate loading downloads from API
+    // Fetch user purchases from Firebase
     const loadDownloads = async () => {
       setIsLoading(true);
       
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const purchasesRef = ref(database, `userPurchases/${user.uid}`);
+        const snapshot = await get(purchasesRef);
         
-        // Mock download data - in real app, this would come from API
-        const mockDownloads = [
-          {
-            id: 'DL-001',
-            productName: 'Premium Software Suite',
-            orderNumber: '#12345',
-            purchaseDate: '2024-10-15',
-            fileSize: '2.5 GB',
-            downloadCount: 2,
-            maxDownloads: 5,
-            expiryDate: '2025-10-15',
-            downloadUrl: '/downloads/premium-software-suite.zip',
-            status: 'available'
-          },
-          {
-            id: 'DL-002',
-            productName: 'Digital Photography Course',
-            orderNumber: '#12344',
-            purchaseDate: '2024-10-10',
-            fileSize: '1.8 GB',
-            downloadCount: 1,
-            maxDownloads: 3,
-            expiryDate: '2025-10-10',
-            downloadUrl: '/downloads/photography-course.zip',
-            status: 'available'
-          },
-          {
-            id: 'DL-003',
-            productName: 'E-book Collection',
-            orderNumber: '#12343',
-            purchaseDate: '2024-10-05',
-            fileSize: '150 MB',
-            downloadCount: 3,
-            maxDownloads: 3,
-            expiryDate: '2025-10-05',
-            downloadUrl: '/downloads/ebook-collection.zip',
-            status: 'expired'
-          },
-          {
-            id: 'DL-004',
-            productName: 'Music Production Templates',
-            orderNumber: '#12342',
-            purchaseDate: '2024-09-30',
-            fileSize: '800 MB',
-            downloadCount: 0,
-            maxDownloads: 10,
-            expiryDate: '2025-09-30',
-            downloadUrl: '/downloads/music-templates.zip',
-            status: 'available'
-          }
-        ];
-        
-        setDownloads(mockDownloads);
+        if (snapshot.exists()) {
+          const purchasesData = snapshot.val();
+          const purchases = Object.values(purchasesData);
+          
+          // Transform purchases to downloads format with unlimited downloads
+          const downloadsData = purchases
+            .filter(purchase => purchase.status === 'completed') // Only completed purchases
+            .map(purchase => ({
+              id: purchase.id,
+              productName: purchase.productTitle,
+              productId: purchase.productId,
+              orderNumber: purchase.orderNumber,
+              purchaseDate: purchase.purchaseDate,
+              fileSize: 'Digital Product', // Default since we don't have file size in purchases
+              downloadCount: 0, // Reset to 0 for unlimited downloads
+              maxDownloads: 'Unlimited', // Set to unlimited
+              expiryDate: 'Never', // No expiry for unlimited downloads
+              downloadUrl: purchase.downloadUrl,
+              status: 'available',
+              price: purchase.price,
+              category: purchase.productCategory || 'Digital'
+            }));
+          
+          setDownloads(downloadsData);
+        } else {
+          setDownloads([]);
+        }
       } catch (error) {
         console.error('Failed to load downloads:', error);
+        setDownloads([]);
       } finally {
         setIsLoading(false);
       }
     };
     
     loadDownloads();
-  }, [user, router]);
+  }, [user, router, loading]);
 
   const handleDownload = async (download) => {
-    if (download.status !== 'available' || downloadingItems.has(download.id)) {
+    if (downloadingItems.has(download.id) || !download.downloadUrl) {
+      if (!download.downloadUrl) {
+        alert('Download URL not available for this product.');
+      }
       return;
     }
 
     setDownloadingItems(prev => new Set([...prev, download.id]));
 
     try {
-      // Simulate download process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get the user's authentication token
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        alert('Please log in to download files.');
+        return;
+      }
+
+      const token = await currentUser.getIdToken();
       
-      // In a real app, you would initiate the actual download here
-      // window.open(download.downloadUrl, '_blank');
+      // Call the API endpoint to get a signed download URL
+      const response = await fetch(`/api/download?productId=${encodeURIComponent(download.productId)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Download failed');
+      }
+
+      const data = await response.json();
       
-      // Update download count
+      if (data.success && data.downloadUrl) {
+        // Open the signed URL for download
+        window.open(data.downloadUrl, '_blank');
+      } else {
+        throw new Error('Failed to get download URL');
+      }
+      
+      // Update download count (for tracking purposes, but unlimited downloads allowed)
       setDownloads(prev => prev.map(item => 
         item.id === download.id 
           ? { ...item, downloadCount: item.downloadCount + 1 }
           : item
       ));
       
-      alert(`Download started for ${download.productName}`);
+      // Short delay to show downloading state
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
     } catch (error) {
-      alert('Download failed. Please try again.');
+      console.error('Download error:', error);
+      alert(`Download failed: ${error.message}`);
     } finally {
       setDownloadingItems(prev => {
         const newSet = new Set(prev);
@@ -137,6 +151,9 @@ export default function DownloadsPage() {
   };
 
   const getStatusText = (download) => {
+    if (download.maxDownloads === 'Unlimited') {
+      return 'Available (Unlimited)';
+    }
     if (download.downloadCount >= download.maxDownloads) {
       return 'Download Limit Reached';
     }
@@ -157,11 +174,12 @@ export default function DownloadsPage() {
 
   const canDownload = (download) => {
     return download.status === 'available' && 
-           download.downloadCount < download.maxDownloads &&
+           (download.maxDownloads === 'Unlimited' || download.downloadCount < download.maxDownloads) &&
            !downloadingItems.has(download.id);
   };
 
-  if (!user) {
+  // Show loading state while authentication is loading or user is not available
+  if (loading || !user) {
     return (
       <div className="font-sans min-h-screen bg-white pt-24 flex items-center justify-center">
         <div className="text-center">
@@ -172,18 +190,19 @@ export default function DownloadsPage() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="font-sans min-h-screen bg-white pt-24">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your downloads...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Removed loading state - downloads will load without showing loading spinner
+  // if (isLoading) {
+  //   return (
+  //     <div className="font-sans min-h-screen bg-white pt-24">
+  //       <div className="max-w-4xl mx-auto px-4 py-8">
+  //         <div className="text-center py-12">
+  //           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+  //           <p className="text-gray-600">Loading your downloads...</p>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="font-sans min-h-screen bg-white pt-24">
@@ -230,24 +249,43 @@ export default function DownloadsPage() {
                       {getStatusText(download)}
                     </span>
                     <span className="text-sm text-gray-600">
-                      {download.downloadCount}/{download.maxDownloads} downloads used
+                      {download.maxDownloads === 'Unlimited' 
+                        ? `${download.downloadCount} downloads used (Unlimited)`
+                        : `${download.downloadCount}/${download.maxDownloads} downloads used`
+                      }
                     </span>
                   </div>
                 </div>
 
-                {/* Download Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Download Usage</span>
-                    <span>{Math.round((download.downloadCount / download.maxDownloads) * 100)}%</span>
+                {/* Download Progress Bar - Only show for limited downloads */}
+                {download.maxDownloads !== 'Unlimited' && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Download Usage</span>
+                      <span>{Math.round((download.downloadCount / download.maxDownloads) * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(download.downloadCount / download.maxDownloads) * 100}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(download.downloadCount / download.maxDownloads) * 100}%` }}
-                    ></div>
+                )}
+                
+                {/* Unlimited Downloads Badge */}
+                {download.maxDownloads === 'Unlimited' && (
+                  <div className="mb-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-sm font-medium text-green-800">Unlimited Downloads Available</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Download Actions */}
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -275,7 +313,10 @@ export default function DownloadsPage() {
                     )}
                   </button>
                   
-                  <button className="flex-1 sm:flex-none px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                  <button 
+                    onClick={() => router.push(`/product/${download.productId}`)}
+                    className="flex-1 sm:flex-none px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                  >
                     View Details
                   </button>
                 </div>
@@ -307,16 +348,17 @@ export default function DownloadsPage() {
 
         {/* Download Information */}
         {downloads.length > 0 && (
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-5 h-5 text-green-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               <div>
-                <h3 className="text-sm font-medium text-blue-900 mb-1">Download Information</h3>
-                <p className="text-sm text-blue-700">
-                  You have {downloads.length} digital product{downloads.length !== 1 ? 's' : ''} available for download. 
-                  Each product has a download limit and expiry date. Make sure to download your files before they expire.
+                <h3 className="text-sm font-medium text-green-900 mb-1">Unlimited Downloads Available</h3>
+                <p className="text-sm text-green-700">
+                  You have {downloads.length} digital product{downloads.length !== 1 ? 's' : ''} available for unlimited downloads. 
+                  All your purchased digital products can be downloaded as many times as you need, with no expiry date. 
+                  Downloads are secured with authentication tokens for your protection.
                 </p>
               </div>
             </div>

@@ -604,6 +604,129 @@ export const clearCart = async (userId: string): Promise<void> => {
   }
 };
 
+// Wishlist Operations
+export interface WishlistItem {
+  id: string;
+  userId: string;
+  productId: string;
+  name: string;
+  price: number;
+  image: string;
+  originalPrice?: number;
+  addedAt: string;
+}
+
+export const addToWishlist = async (userId: string, product: Product): Promise<string> => {
+  try {
+    const wishlistRef = ref(database, `wishlists/${userId}`);
+    const wishlistSnapshot = await get(wishlistRef);
+    
+    let wishlistItems: { [key: string]: WishlistItem } = {};
+    if (wishlistSnapshot.exists()) {
+      wishlistItems = wishlistSnapshot.val();
+    }
+    
+    // Check if product already exists in wishlist
+    const existingItem = Object.values(wishlistItems).find(item => item.productId === product.id);
+    
+    if (existingItem) {
+      // Item already in wishlist, return existing ID
+      return existingItem.id;
+    } else {
+      // Add new item to wishlist
+      const wishlistItemsRef = ref(database, `wishlists/${userId}`);
+      const newItemRef = push(wishlistItemsRef);
+      const itemId = newItemRef.key!;
+      
+      const wishlistItem: WishlistItem = {
+        id: itemId,
+        userId,
+        productId: product.id,
+        name: product.title,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+        addedAt: new Date().toISOString()
+      };
+      
+      await set(newItemRef, wishlistItem);
+      return itemId;
+    }
+  } catch (error) {
+    console.error('Error adding to wishlist:', error);
+    throw error;
+  }
+};
+
+export const getWishlistItems = async (userId: string): Promise<WishlistItem[]> => {
+  try {
+    const wishlistRef = ref(database, `wishlists/${userId}`);
+    const snapshot = await get(wishlistRef);
+    
+    if (snapshot.exists()) {
+      const wishlistData = snapshot.val();
+      return Object.values(wishlistData) as WishlistItem[];
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting wishlist items:', error);
+    throw error;
+  }
+};
+
+export const listenToWishlist = (userId: string, callback: (items: WishlistItem[]) => void): (() => void) => {
+  const wishlistRef = ref(database, `wishlists/${userId}`);
+  
+  const unsubscribe = onValue(wishlistRef, (snapshot) => {
+    if (snapshot.exists()) {
+      const wishlistData = snapshot.val();
+      const items = Object.values(wishlistData) as WishlistItem[];
+      callback(items);
+    } else {
+      callback([]);
+    }
+  });
+
+  return () => off(wishlistRef, 'value', unsubscribe);
+};
+
+export const removeFromWishlist = async (userId: string, itemId: string): Promise<void> => {
+  try {
+    const itemRef = ref(database, `wishlists/${userId}/${itemId}`);
+    await remove(itemRef);
+  } catch (error) {
+    console.error('Error removing from wishlist:', error);
+    throw error;
+  }
+};
+
+export const clearWishlist = async (userId: string): Promise<void> => {
+  try {
+    const wishlistRef = ref(database, `wishlists/${userId}`);
+    await remove(wishlistRef);
+  } catch (error) {
+    console.error('Error clearing wishlist:', error);
+    throw error;
+  }
+};
+
+export const isInWishlist = async (userId: string, productId: string): Promise<boolean> => {
+  try {
+    const wishlistRef = ref(database, `wishlists/${userId}`);
+    const snapshot = await get(wishlistRef);
+    
+    if (snapshot.exists()) {
+      const wishlistData = snapshot.val();
+      const items = Object.values(wishlistData) as WishlistItem[];
+      return items.some(item => item.productId === productId);
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking wishlist:', error);
+    return false;
+  }
+};
+
 export const listenToUserPurchases = (userId: string, callback: (purchases: Purchase[]) => void): (() => void) => {
   const userPurchasesRef = ref(database, `userPurchases/${userId}`);
   

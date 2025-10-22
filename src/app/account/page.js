@@ -3,36 +3,76 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { database } from '@/lib/firebase';
+import { ref, get, set, push } from 'firebase/database';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 export default function AccountDetailsPage() {
-  const { user } = useAuth() || { user: null };
+  const { user, loading } = useAuth() || { user: null, loading: true };
   const router = useRouter();
   
   const [accountDetails, setAccountDetails] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
+    phone: '',
     email: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Redirect if not logged in
+  // Fetch user data from userAddresses and set initial values
   useEffect(() => {
+    // Wait for authentication to load before checking user
+    if (loading) {
+      return;
+    }
+    
     if (!user) {
       router.push('/auth');
       return;
     }
     
-    // Pre-fill account details if user data exists
-    setAccountDetails({
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      email: user.email || ''
-    });
-  }, [user, router]);
+    const fetchUserData = async () => {
+      try {
+        // First, set email from user auth
+        setAccountDetails(prev => ({
+          ...prev,
+          email: user.email || ''
+        }));
+
+        // Try to fetch name and phone from userAddresses
+        const addressesRef = ref(database, `userAddresses/${user.uid}`);
+        const snapshot = await get(addressesRef);
+        
+        if (snapshot.exists()) {
+          const addressesData = snapshot.val();
+          // Get the most recent address (or first one found)
+          const addresses = Object.values(addressesData);
+          if (addresses.length > 0) {
+            const latestAddress = addresses.sort((a, b) => 
+              new Date(b.createdAt) - new Date(a.createdAt)
+            )[0];
+            
+            setAccountDetails(prev => ({
+              ...prev,
+              name: latestAddress.name || '',
+              phone: latestAddress.phone || ''
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        // Set default email even if address fetch fails
+        setAccountDetails(prev => ({
+          ...prev,
+          email: user.email || ''
+        }));
+      }
+    };
+
+    fetchUserData();
+  }, [user, router, loading]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,12 +93,14 @@ export default function AccountDetailsPage() {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!accountDetails.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+    if (!accountDetails.name.trim()) {
+      newErrors.name = 'Name is required';
     }
     
-    if (!accountDetails.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+    if (!accountDetails.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^[6-9]\d{9}$/.test(accountDetails.phone)) {
+      newErrors.phone = 'Phone number must be a valid Indian number (10 digits starting with 6-9)';
     }
     
     if (!accountDetails.email.trim()) {
@@ -81,19 +123,34 @@ export default function AccountDetailsPage() {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Save to userAddresses collection
+      const addressesRef = ref(database, `userAddresses/${user.uid}`);
+      const newAddressRef = push(addressesRef);
+      
+      const addressData = {
+        id: newAddressRef.key,
+        userId: user.uid,
+        name: accountDetails.name,
+        email: accountDetails.email,
+        phone: accountDetails.phone,
+        createdAt: new Date().toISOString(),
+        isDefault: true // Mark as default address
+      };
+      
+      await set(newAddressRef, addressData);
       
       alert('Account details updated successfully!');
       
     } catch (error) {
+      console.error('Error saving account details:', error);
       alert('Failed to update account details. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!user) {
+  // Show loading state while authentication is loading or user is not available
+  if (loading || !user) {
     return (
       <div className="font-sans min-h-screen bg-white pt-24 flex items-center justify-center">
         <div className="text-center">
@@ -130,45 +187,51 @@ export default function AccountDetailsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Personal Information</h2>
           
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* First Name */}
+            {/* Name */}
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                First Name *
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name *
               </label>
               <input
                 type="text"
-                id="firstName"
-                name="firstName"
-                value={accountDetails.firstName}
+                id="name"
+                name="name"
+                value={accountDetails.name}
                 onChange={handleInputChange}
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.firstName ? 'border-red-500' : 'border-gray-300'
+                  errors.name ? 'border-red-500' : 'border-gray-300'
                 }`}
-                placeholder="Enter your first name"
+                placeholder="Enter your full name"
               />
-              {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600">{errors.firstName}</p>
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
               )}
             </div>
 
-            {/* Last Name */}
+            {/* Phone Number */}
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name *
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number *
               </label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={accountDetails.lastName}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.lastName ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter your last name"
-              />
-              {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600">{errors.lastName}</p>
+              <div className="flex">
+                <div className="flex items-center px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg">
+                  <span className="text-gray-700 font-medium">+91</span>
+                </div>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={accountDetails.phone}
+                  onChange={handleInputChange}
+                  maxLength="10"
+                  className={`flex-1 px-4 py-3 border rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter 10-digit phone number"
+                />
+              </div>
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
               )}
             </div>
 
