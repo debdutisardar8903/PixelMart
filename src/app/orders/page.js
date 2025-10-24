@@ -90,11 +90,11 @@ export default function OrdersPage() {
                     price: product.price || productData?.price || 0,
                     quantity: product.quantity || 1,
                     image: productData?.image || '/api/placeholder/100/100',
-                    downloadUrl: productData?.productFileUrl, // Use product file URL for downloads
+                    downloadUrl: productData?.productFileUrl, // Fetch productFileUrl from products collection
                     category: productData?.category,
                     productId: product.productId,
-                    // Only show download for completed/paid orders
-                    canDownload: order.paymentStatus === 'paid' && order.orderStatus === 'completed'
+                    // Only show download for completed/paid orders and if productFileUrl exists
+                    canDownload: order.paymentStatus === 'paid' && order.orderStatus === 'completed' && productData?.productFileUrl
                   };
                   
                   items.push(item);

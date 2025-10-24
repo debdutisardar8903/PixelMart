@@ -11,7 +11,6 @@ export const dynamic = 'force-dynamic';
 import { verifyPayment } from '@/lib/payment';
 import { database } from '@/lib/firebase';
 import { ref, get, set } from 'firebase/database';
-import { completePayment } from '@/lib/database';
 
 function PaymentSuccessForm() {
   const { user } = useAuth();
@@ -56,8 +55,8 @@ function PaymentSuccessForm() {
       if (isPaymentSuccess) {
         setPaymentVerified(true);
         
-        // Complete payment process - this will update order status AND create userPurchases
-        await completePayment(orderId, verification, user?.uid);
+        // Update order status in Firebase
+        await updateOrderStatus(orderId, 'completed', 'paid');
         
         // Get order details from Firebase
         const orderData = await getOrderDetails(orderId);
@@ -80,6 +79,53 @@ function PaymentSuccessForm() {
     }
   };
 
+  const updateOrderStatus = async (orderId, orderStatus, paymentStatus) => {
+    try {
+      // Find and update the order in Firebase following database rules
+      const ordersRef = ref(database, 'paymentOrders');
+      const snapshot = await get(ordersRef);
+      
+      if (snapshot.exists()) {
+        const orders = snapshot.val();
+        
+        // Find the order with matching orderId
+        for (const [key, order] of Object.entries(orders)) {
+          if (order.orderId === orderId) {
+            const orderRef = ref(database, `paymentOrders/${key}`);
+            
+            // Update following database rules - ensure all required fields are present
+            const updatedOrder = {
+              // Required fields (from database rules)
+              id: order.id,
+              orderId: order.orderId,
+              userId: order.userId,
+              customerName: order.customerName,
+              customerEmail: order.customerEmail,
+              customerPhone: order.customerPhone,
+              orderAmount: order.orderAmount,
+              orderStatus: orderStatus, // Update to 'completed'
+              paymentStatus: paymentStatus, // Update to 'paid'
+              products: order.products,
+              createdAt: order.createdAt,
+              updatedAt: new Date().toISOString(),
+              
+              // Optional fields (preserve if they exist)
+              ...(order.paymentSessionId && { paymentSessionId: order.paymentSessionId }),
+              ...(orderStatus === 'completed' && { completedAt: new Date().toISOString() }),
+              ...(order.paymentData && { paymentData: order.paymentData })
+            };
+            
+            await set(orderRef, updatedOrder);
+            console.log('Order status updated successfully:', updatedOrder);
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      throw error; // Re-throw to handle in calling function
+    }
+  };
 
   const getOrderDetails = async (orderId) => {
     try {

@@ -31,116 +31,49 @@ export default function DownloadsPage() {
       setIsLoading(true);
       
       try {
-        if (!user?.uid) {
-          setDownloads([]);
-          return;
-        }
-
-        // First try to get user purchases
         const purchasesRef = ref(database, `userPurchases/${user.uid}`);
         const snapshot = await get(purchasesRef);
         
         if (snapshot.exists()) {
           const purchasesData = snapshot.val();
+          const purchases = Object.values(purchasesData);
           
-          // Ensure purchasesData is an object
-          if (purchasesData && typeof purchasesData === 'object') {
-            const purchases = Object.values(purchasesData);
-            
-            // Get products data to enrich purchase information
-            const productsRef = ref(database, 'products');
-            const productsSnapshot = await get(productsRef);
-            const productsData = productsSnapshot.exists() ? productsSnapshot.val() : {};
-            
-            // Transform purchases to downloads format with unlimited downloads
-            const downloadsData = purchases
-              .filter(purchase => 
-                purchase && 
-                purchase.status === 'completed' && 
-                purchase.productId && 
-                purchase.productTitle
-              )
-              .map(purchase => {
-                // Get product details for additional info
-                const productData = productsData[purchase.productId];
-                
-                return {
-                  id: purchase.id || purchase.productId,
-                  productName: purchase.productTitle || 'Unknown Product',
-                  productId: purchase.productId,
-                  orderNumber: purchase.orderNumber || 'N/A',
-                  purchaseDate: purchase.purchaseDate || new Date().toISOString(),
-                  fileSize: productData?.downloadSize || 'Digital Product',
-                  downloadCount: 0, // Reset to 0 for unlimited downloads
-                  maxDownloads: 'Unlimited', // Set to unlimited
-                  expiryDate: 'Never', // No expiry for unlimited downloads
-                  productFileUrl: productData?.productFileUrl || '',
-                  status: 'available',
-                  price: purchase.price || 0,
-                  category: purchase.productCategory || productData?.category || 'Digital'
-                };
-              });
-            
-            setDownloads(downloadsData);
-          } else {
-            setDownloads([]);
-          }
+          // Get products data to fetch productFileUrl for each purchase
+          const productsRef = ref(database, 'products');
+          const productsSnapshot = await get(productsRef);
+          const productsData = productsSnapshot.exists() ? productsSnapshot.val() : {};
+          
+          // Transform purchases to downloads format with unlimited downloads
+          const downloadsData = purchases
+            .filter(purchase => purchase.status === 'completed') // Only completed purchases
+            .map(purchase => {
+              // Get product data to fetch productFileUrl
+              const productData = productsData[purchase.productId];
+              
+              return {
+                id: purchase.id,
+                productName: purchase.productTitle,
+                productId: purchase.productId,
+                orderNumber: purchase.orderNumber,
+                purchaseDate: purchase.purchaseDate,
+                fileSize: productData?.downloadSize || 'Digital Product',
+                downloadCount: 0, // Reset to 0 for unlimited downloads
+                maxDownloads: 'Unlimited', // Set to unlimited
+                expiryDate: 'Never', // No expiry for unlimited downloads
+                downloadUrl: productData?.productFileUrl, // Fetch from products collection
+                status: productData?.productFileUrl ? 'available' : 'unavailable',
+                price: purchase.price,
+                category: purchase.productCategory || productData?.category || 'Digital'
+              };
+            })
+            .filter(download => download.downloadUrl); // Only include items with valid download URLs
+          
+          setDownloads(downloadsData);
         } else {
-          // If no userPurchases, try to check paymentOrders for completed orders
-          const ordersRef = ref(database, 'paymentOrders');
-          const ordersSnapshot = await get(ordersRef);
-          
-          if (ordersSnapshot.exists()) {
-            const ordersData = ordersSnapshot.val();
-            const userOrders = Object.values(ordersData)
-              .filter(order => 
-                order.userId === user.uid && 
-                order.paymentStatus === 'paid' && 
-                order.orderStatus === 'completed'
-              );
-            
-            if (userOrders.length > 0) {
-              // Get products data
-              const productsRef = ref(database, 'products');
-              const productsSnapshot = await get(productsRef);
-              const productsData = productsSnapshot.exists() ? productsSnapshot.val() : {};
-              
-              // Create downloads from completed orders
-              const downloadsFromOrders = [];
-              
-              userOrders.forEach(order => {
-                if (order.products && typeof order.products === 'object') {
-                  Object.values(order.products).forEach(product => {
-                    const productData = productsData[product.productId];
-                    
-                    downloadsFromOrders.push({
-                      id: `${order.orderId}-${product.productId}`,
-                      productName: product.title || productData?.title || 'Unknown Product',
-                      productId: product.productId,
-                      orderNumber: order.orderId,
-                      purchaseDate: order.completedAt || order.createdAt,
-                      fileSize: productData?.downloadSize || 'Digital Product',
-                      downloadCount: 0,
-                      maxDownloads: 'Unlimited',
-                      expiryDate: 'Never',
-                      productFileUrl: productData?.productFileUrl || '',
-                      status: 'available',
-                      price: product.price || 0,
-                      category: productData?.category || 'Digital'
-                    });
-                  });
-                }
-              });
-              
-              setDownloads(downloadsFromOrders);
-            } else {
-              setDownloads([]);
-            }
-          } else {
-            setDownloads([]);
-          }
+          setDownloads([]);
         }
       } catch (error) {
+        console.error('Failed to load downloads:', error);
         setDownloads([]);
       } finally {
         setIsLoading(false);
@@ -151,28 +84,16 @@ export default function DownloadsPage() {
   }, [user, router, loading]);
 
   const handleDownload = async (download) => {
-    if (downloadingItems.has(download.id)) {
+    if (downloadingItems.has(download.id) || !download.downloadUrl) {
+      if (!download.downloadUrl) {
+        alert('Download URL not available for this product.');
+      }
       return;
     }
 
     setDownloadingItems(prev => new Set([...prev, download.id]));
 
     try {
-      // Get fresh productFileUrl from database
-      const productRef = ref(database, `products/${download.productId}`);
-      const productSnapshot = await get(productRef);
-      
-      if (!productSnapshot.exists()) {
-        throw new Error('Product not found.');
-      }
-      
-      const productData = productSnapshot.val();
-      const productFileUrl = productData.productFileUrl;
-      
-      if (!productFileUrl) {
-        throw new Error('Download file not available for this product.');
-      }
-
       // Get the user's authentication token
       const currentUser = auth.currentUser;
       if (!currentUser) {
@@ -182,8 +103,8 @@ export default function DownloadsPage() {
 
       const token = await currentUser.getIdToken();
       
-      // Call the API endpoint to get a signed download URL using fresh productFileUrl
-      const response = await fetch(`/api/download?productId=${encodeURIComponent(download.productId)}&fileUrl=${encodeURIComponent(productFileUrl)}`, {
+      // Call the API endpoint to get a signed download URL
+      const response = await fetch(`/api/download?productId=${encodeURIComponent(download.productId)}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

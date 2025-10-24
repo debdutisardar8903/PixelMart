@@ -112,7 +112,7 @@
         ".read": "$uid === auth.uid",
         ".write": "$uid === auth.uid",
         "$purchaseId": {
-          ".validate": "newData.hasChildren(['id', 'userId', 'productId', 'productTitle', 'productCategory', 'price', 'downloadUrl', 'purchaseDate', 'status', 'orderNumber'])"
+          ".validate": "newData.hasChildren(['id', 'userId', 'productId', 'productTitle', 'productCategory', 'price', 'purchaseDate', 'status', 'orderNumber'])"
         }
       }
     },

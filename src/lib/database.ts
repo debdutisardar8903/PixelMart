@@ -51,7 +51,6 @@ export interface Purchase {
   productTitle: string;
   productCategory: string;
   price: number;
-  downloadUrl: string;
   purchaseDate: string;
   status: 'completed' | 'processing' | 'failed';
   orderNumber: string;
@@ -1037,7 +1036,6 @@ export const completePayment = async (orderId: string, paymentData: any, userId?
         productTitle: product.title,
         productCategory: '', // Will be filled from product data
         price: product.price,
-        downloadUrl: '', // Required by database rules but will fetch productFileUrl directly
         purchaseDate: new Date().toISOString(),
         status: 'completed',
         orderNumber: orderId
@@ -1051,8 +1049,7 @@ export const completePayment = async (orderId: string, paymentData: any, userId?
         if (productSnapshot.exists()) {
           const productData = productSnapshot.val() as Product;
           purchaseData.productCategory = productData.category;
-          // Keep downloadUrl empty - will fetch productFileUrl directly when needed
-          purchaseData.downloadUrl = ''; 
+          // Note: productFileUrl will be fetched from products collection when needed
         }
       } catch (error) {
         console.error('Error fetching product details for purchase:', error);
