@@ -1050,12 +1050,23 @@ export const completePayment = async (orderId: string, paymentData: any, userId?
         
         if (productSnapshot.exists()) {
           const productData = productSnapshot.val() as Product;
-          purchaseData.productCategory = productData.category;
-          purchaseData.downloadUrl = productData.productFileUrl || '';
+          purchaseData.productCategory = productData.category || 'Digital';
+          
+          // Ensure downloadUrl is properly set from productFileUrl
+          if (productData.productFileUrl) {
+            purchaseData.downloadUrl = productData.productFileUrl;
+            console.log(`✅ Download URL set for product ${product.productId}:`, productData.productFileUrl);
+          } else {
+            console.warn(`⚠️ No productFileUrl found for product ${product.productId}`);
+            purchaseData.downloadUrl = '';
+          }
+        } else {
+          console.error(`❌ Product ${product.productId} not found in database`);
         }
       } catch (error) {
         console.error('Error fetching product details for purchase:', error);
-        // Continue with default values
+        // Continue with default values but log the issue
+        console.error(`Failed to get downloadUrl for product ${product.productId}`);
       }
 
       console.log('Creating purchase record:', purchaseData);
