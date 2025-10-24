@@ -74,7 +74,7 @@ export default function DownloadsPage() {
                   downloadCount: 0, // Reset to 0 for unlimited downloads
                   maxDownloads: 'Unlimited', // Set to unlimited
                   expiryDate: 'Never', // No expiry for unlimited downloads
-                  downloadUrl: purchase.downloadUrl || productData?.productFileUrl,
+                  productFileUrl: productData?.productFileUrl || '',
                   status: 'available',
                   price: purchase.price || 0,
                   category: purchase.productCategory || productData?.category || 'Digital'
@@ -123,7 +123,7 @@ export default function DownloadsPage() {
                       downloadCount: 0,
                       maxDownloads: 'Unlimited',
                       expiryDate: 'Never',
-                      downloadUrl: productData?.productFileUrl,
+                      productFileUrl: productData?.productFileUrl || '',
                       status: 'available',
                       price: product.price || 0,
                       category: productData?.category || 'Digital'
@@ -151,16 +151,28 @@ export default function DownloadsPage() {
   }, [user, router, loading]);
 
   const handleDownload = async (download) => {
-    if (downloadingItems.has(download.id) || !download.downloadUrl) {
-      if (!download.downloadUrl) {
-        alert('Download URL not available for this product.');
-      }
+    if (downloadingItems.has(download.id)) {
       return;
     }
 
     setDownloadingItems(prev => new Set([...prev, download.id]));
 
     try {
+      // Get fresh productFileUrl from database
+      const productRef = ref(database, `products/${download.productId}`);
+      const productSnapshot = await get(productRef);
+      
+      if (!productSnapshot.exists()) {
+        throw new Error('Product not found.');
+      }
+      
+      const productData = productSnapshot.val();
+      const productFileUrl = productData.productFileUrl;
+      
+      if (!productFileUrl) {
+        throw new Error('Download file not available for this product.');
+      }
+
       // Get the user's authentication token
       const currentUser = auth.currentUser;
       if (!currentUser) {
@@ -170,8 +182,8 @@ export default function DownloadsPage() {
 
       const token = await currentUser.getIdToken();
       
-      // Call the API endpoint to get a signed download URL
-      const response = await fetch(`/api/download?productId=${encodeURIComponent(download.productId)}`, {
+      // Call the API endpoint to get a signed download URL using fresh productFileUrl
+      const response = await fetch(`/api/download?productId=${encodeURIComponent(download.productId)}&fileUrl=${encodeURIComponent(productFileUrl)}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

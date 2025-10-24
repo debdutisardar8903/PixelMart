@@ -1037,7 +1037,7 @@ export const completePayment = async (orderId: string, paymentData: any, userId?
         productTitle: product.title,
         productCategory: '', // Will be filled from product data
         price: product.price,
-        downloadUrl: '', // Will be filled from product data
+        downloadUrl: '', // Required by database rules but will fetch productFileUrl directly
         purchaseDate: new Date().toISOString(),
         status: 'completed',
         orderNumber: orderId
@@ -1050,23 +1050,13 @@ export const completePayment = async (orderId: string, paymentData: any, userId?
         
         if (productSnapshot.exists()) {
           const productData = productSnapshot.val() as Product;
-          purchaseData.productCategory = productData.category || 'Digital';
-          
-          // Ensure downloadUrl is properly set from productFileUrl
-          if (productData.productFileUrl) {
-            purchaseData.downloadUrl = productData.productFileUrl;
-            console.log(`✅ Download URL set for product ${product.productId}:`, productData.productFileUrl);
-          } else {
-            console.warn(`⚠️ No productFileUrl found for product ${product.productId}`);
-            purchaseData.downloadUrl = '';
-          }
-        } else {
-          console.error(`❌ Product ${product.productId} not found in database`);
+          purchaseData.productCategory = productData.category;
+          // Keep downloadUrl empty - will fetch productFileUrl directly when needed
+          purchaseData.downloadUrl = ''; 
         }
       } catch (error) {
         console.error('Error fetching product details for purchase:', error);
-        // Continue with default values but log the issue
-        console.error(`Failed to get downloadUrl for product ${product.productId}`);
+        // Continue with default values
       }
 
       console.log('Creating purchase record:', purchaseData);
