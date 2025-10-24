@@ -31,38 +31,116 @@ export default function DownloadsPage() {
       setIsLoading(true);
       
       try {
+        if (!user?.uid) {
+          setDownloads([]);
+          return;
+        }
+
+        // First try to get user purchases
         const purchasesRef = ref(database, `userPurchases/${user.uid}`);
         const snapshot = await get(purchasesRef);
         
         if (snapshot.exists()) {
           const purchasesData = snapshot.val();
-          const purchases = Object.values(purchasesData);
           
-          // Transform purchases to downloads format with unlimited downloads
-          const downloadsData = purchases
-            .filter(purchase => purchase.status === 'completed') // Only completed purchases
-            .map(purchase => ({
-              id: purchase.id,
-              productName: purchase.productTitle,
-              productId: purchase.productId,
-              orderNumber: purchase.orderNumber,
-              purchaseDate: purchase.purchaseDate,
-              fileSize: 'Digital Product', // Default since we don't have file size in purchases
-              downloadCount: 0, // Reset to 0 for unlimited downloads
-              maxDownloads: 'Unlimited', // Set to unlimited
-              expiryDate: 'Never', // No expiry for unlimited downloads
-              downloadUrl: purchase.downloadUrl,
-              status: 'available',
-              price: purchase.price,
-              category: purchase.productCategory || 'Digital'
-            }));
-          
-          setDownloads(downloadsData);
+          // Ensure purchasesData is an object
+          if (purchasesData && typeof purchasesData === 'object') {
+            const purchases = Object.values(purchasesData);
+            
+            // Get products data to enrich purchase information
+            const productsRef = ref(database, 'products');
+            const productsSnapshot = await get(productsRef);
+            const productsData = productsSnapshot.exists() ? productsSnapshot.val() : {};
+            
+            // Transform purchases to downloads format with unlimited downloads
+            const downloadsData = purchases
+              .filter(purchase => 
+                purchase && 
+                purchase.status === 'completed' && 
+                purchase.productId && 
+                purchase.productTitle
+              )
+              .map(purchase => {
+                // Get product details for additional info
+                const productData = productsData[purchase.productId];
+                
+                return {
+                  id: purchase.id || purchase.productId,
+                  productName: purchase.productTitle || 'Unknown Product',
+                  productId: purchase.productId,
+                  orderNumber: purchase.orderNumber || 'N/A',
+                  purchaseDate: purchase.purchaseDate || new Date().toISOString(),
+                  fileSize: productData?.downloadSize || 'Digital Product',
+                  downloadCount: 0, // Reset to 0 for unlimited downloads
+                  maxDownloads: 'Unlimited', // Set to unlimited
+                  expiryDate: 'Never', // No expiry for unlimited downloads
+                  downloadUrl: purchase.downloadUrl || productData?.productFileUrl,
+                  status: 'available',
+                  price: purchase.price || 0,
+                  category: purchase.productCategory || productData?.category || 'Digital'
+                };
+              });
+            
+            setDownloads(downloadsData);
+          } else {
+            setDownloads([]);
+          }
         } else {
-          setDownloads([]);
+          // If no userPurchases, try to check paymentOrders for completed orders
+          const ordersRef = ref(database, 'paymentOrders');
+          const ordersSnapshot = await get(ordersRef);
+          
+          if (ordersSnapshot.exists()) {
+            const ordersData = ordersSnapshot.val();
+            const userOrders = Object.values(ordersData)
+              .filter(order => 
+                order.userId === user.uid && 
+                order.paymentStatus === 'paid' && 
+                order.orderStatus === 'completed'
+              );
+            
+            if (userOrders.length > 0) {
+              // Get products data
+              const productsRef = ref(database, 'products');
+              const productsSnapshot = await get(productsRef);
+              const productsData = productsSnapshot.exists() ? productsSnapshot.val() : {};
+              
+              // Create downloads from completed orders
+              const downloadsFromOrders = [];
+              
+              userOrders.forEach(order => {
+                if (order.products && typeof order.products === 'object') {
+                  Object.values(order.products).forEach(product => {
+                    const productData = productsData[product.productId];
+                    
+                    downloadsFromOrders.push({
+                      id: `${order.orderId}-${product.productId}`,
+                      productName: product.title || productData?.title || 'Unknown Product',
+                      productId: product.productId,
+                      orderNumber: order.orderId,
+                      purchaseDate: order.completedAt || order.createdAt,
+                      fileSize: productData?.downloadSize || 'Digital Product',
+                      downloadCount: 0,
+                      maxDownloads: 'Unlimited',
+                      expiryDate: 'Never',
+                      downloadUrl: productData?.productFileUrl,
+                      status: 'available',
+                      price: product.price || 0,
+                      category: productData?.category || 'Digital'
+                    });
+                  });
+                }
+              });
+              
+              setDownloads(downloadsFromOrders);
+            } else {
+              setDownloads([]);
+            }
+          } else {
+            setDownloads([]);
+          }
         }
       } catch (error) {
-        console.error('Failed to load downloads:', error);
         setDownloads([]);
       } finally {
         setIsLoading(false);
