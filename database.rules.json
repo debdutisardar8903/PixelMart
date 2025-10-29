@@ -1,0 +1,207 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null && auth.token.email == 'admin.743245da@gmail.com'",
+      "$uid": {
+        ".read": "$uid === auth.uid || (auth != null && auth.token.email == 'admin.743245da@gmail.com')",
+        ".write": "$uid === auth.uid || (auth != null && auth.token.email == 'admin.743245da@gmail.com')",
+        ".validate": "newData.hasChildren(['uid', 'email', 'displayName', 'profileImageUrl'])",
+        "uid": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "displayName": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "photoURL": {
+          ".validate": "newData.isString() || newData.val() === null"
+        },
+        "profileImageUrl": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "emailVerified": {
+          ".validate": "newData.isBoolean()"
+        },
+        "createdAt": {
+          ".validate": "newData.val() === now || (data.exists() && newData.val() === data.val()) || newData.isNumber()"
+        },
+        "lastLoginAt": {
+          ".validate": "newData.val() === now || newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "banners": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'admin.743245da@gmail.com'",
+      "video": {
+        ".validate": "newData.hasChildren(['url', 'key', 'fileName', 'fileSize', 'uploadedAt', 'uploadedBy'])"
+      }
+    },
+    "products": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'admin.743245da@gmail.com'",
+      "$productId": {
+        ".validate": "newData.hasChildren(['name', 'description', 'price', 'category', 'createdAt', 'createdBy'])",
+        "image": {
+          ".read": true
+        },
+        "images": {
+          ".read": true
+        },
+        "downloadUrl": {
+          ".read": "auth != null"
+        },
+        "downloadKey": {
+          ".read": "auth != null && auth.token.email == 'admin.743245da@gmail.com'"
+        }
+      }
+    },
+    "coupons": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'admin.743245da@gmail.com'",
+      "$couponId": {
+        ".validate": "newData.hasChildren(['code', 'discount', 'type', 'description', 'isActive', 'createdAt', 'createdBy'])"
+      }
+    },
+    "reviews": {
+      ".read": true,
+      ".write": "auth != null",
+      "$productId": {
+        "$reviewId": {
+          ".validate": "newData.hasChildren(['userId', 'userName', 'userPhotoUrl', 'rating', 'comment', 'createdAt'])",
+          "userId": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "userName": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "userPhotoUrl": {
+            ".validate": "newData.isString() || newData.val() === null"
+          },
+          "rating": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5"
+          },
+          "comment": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          }
+        }
+      }
+    },
+    "orders": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$orderId": {
+        ".validate": "newData.hasChildren(['orderId', 'userId', 'products', 'totalAmount', 'paymentStatus', 'paymentDate', 'customerInfo'])",
+        "orderId": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "userId": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "products": {
+          ".validate": "newData.exists()"
+        },
+        "totalAmount": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "paymentStatus": {
+          ".validate": "newData.isString() && (newData.val() === 'SUCCESS' || newData.val() === 'FAILED' || newData.val() === 'PENDING')"
+        },
+        "paymentDate": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "customerInfo": {
+          ".validate": "newData.hasChildren(['name', 'email', 'phone'])"
+        }
+      }
+    },
+    "wishlists": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$userId": {
+        ".read": "$userId === auth.uid",
+        ".write": "$userId === auth.uid",
+        "$productId": {
+          ".validate": "newData.hasChildren(['productId', 'userId', 'name', 'price', 'image', 'addedAt'])",
+          "productId": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "userId": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "price": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "image": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "originalPrice": {
+            ".validate": "newData.isNumber() || newData.val() === null"
+          },
+          "category": {
+            ".validate": "newData.isString() || newData.val() === null"
+          },
+          "addedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          }
+        }
+      }
+    },
+    "carts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$userId": {
+        ".read": "$userId === auth.uid",
+        ".write": "$userId === auth.uid",
+        "$productId": {
+          ".validate": "newData.hasChildren(['productId', 'userId', 'name', 'price', 'image', 'quantity', 'addedAt'])",
+          "productId": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "userId": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "price": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "image": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "originalPrice": {
+            ".validate": "newData.isNumber() || newData.val() === null"
+          },
+          "category": {
+            ".validate": "newData.isString() || newData.val() === null"
+          },
+          "quantity": {
+            ".validate": "newData.isNumber() && newData.val() >= 1"
+          },
+          "addedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          }
+        }
+      }
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
