@@ -1,0 +1,252 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { ref, get } from 'firebase/database';
+import { database } from '@/lib/firebase';
+import { useWishlist } from '@/components/contexts/WishlistContext';
+import { useCart } from '@/components/contexts/CartContext';
+import ClientOnly from './ClientOnly';
+
+export default function ProductGrid({ products }) {
+  const [hoveredProduct, setHoveredProduct] = useState(null);
+  const [productRatings, setProductRatings] = useState({});
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { addToCart } = useCart();
+
+  // Fetch ratings for all products
+  useEffect(() => {
+    const fetchProductRatings = async () => {
+      if (!products || products.length === 0) return;
+
+      const ratingsData = {};
+      
+      try {
+        // Fetch ratings for each product
+        await Promise.all(
+          products.map(async (product) => {
+            try {
+              const reviewsRef = ref(database, `reviews/${product.id}`);
+              const snapshot = await get(reviewsRef);
+              
+              if (snapshot.exists()) {
+                const reviewsData = snapshot.val();
+                const reviewsArray = Object.values(reviewsData);
+                
+                // Calculate average rating
+                const totalRating = reviewsArray.reduce((sum, review) => sum + (review.rating || 0), 0);
+                const averageRating = reviewsArray.length > 0 ? totalRating / reviewsArray.length : 0;
+                
+                ratingsData[product.id] = {
+                  averageRating: parseFloat(averageRating.toFixed(1)),
+                  reviewCount: reviewsArray.length
+                };
+              } else {
+                // No reviews found, use product default or 0
+                ratingsData[product.id] = {
+                  averageRating: product.rating || 0,
+                  reviewCount: product.reviews || 0
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching reviews for product ${product.id}:`, error);
+              // Fallback to product data
+              ratingsData[product.id] = {
+                averageRating: product.rating || 0,
+                reviewCount: product.reviews || 0
+              };
+            }
+          })
+        );
+        
+        setProductRatings(ratingsData);
+        console.log('Product ratings fetched:', ratingsData);
+      } catch (error) {
+        console.error('Error fetching product ratings:', error);
+      }
+    };
+
+    fetchProductRatings();
+  }, [products]);
+
+  const handleWishlistClick = (e, product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const wishlistItem = {
+      id: product.id.toString(),
+      productId: product.id.toString(), // Add productId for database compatibility
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      originalPrice: product.originalPrice
+    };
+
+    if (isInWishlist(product.id.toString())) {
+      removeFromWishlist(product.id.toString());
+    } else {
+      addToWishlist(wishlistItem);
+    }
+  };
+
+  const handleAddToCart = (e, product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const cartItem = {
+      id: product.id.toString(),
+      productId: product.id.toString(), // Add productId for database compatibility
+      name: product.name,
+      title: product.name, // Add title for database compatibility
+      price: product.price,
+      image: product.image,
+      quantity: 1,
+      originalPrice: product.originalPrice,
+      // Add additional fields that might be needed by database
+      category: 'digital', // Default category, will be updated from database
+      downloadSize: 'Unknown', // Will be updated from database
+      fileFormat: 'Digital', // Will be updated from database
+      description: product.name // Will be updated from database
+    };
+
+    addToCart(cartItem);
+  };
+
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+          <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+        </svg>
+      );
+    }
+
+    if (hasHalfStar) {
+      stars.push(
+        <svg key="half" className="w-4 h-4 text-yellow-400" viewBox="0 0 20 20">
+          <defs>
+            <linearGradient id="half-fill">
+              <stop offset="50%" stopColor="currentColor"/>
+              <stop offset="50%" stopColor="transparent"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#half-fill)" d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+        </svg>
+      );
+    }
+
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <svg key={`empty-${i}`} className="w-4 h-4 text-gray-300" viewBox="0 0 20 20">
+          <path fill="currentColor" d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+        </svg>
+      );
+    }
+
+    return stars;
+  };
+
+  const CartIcon = () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0h8m-8 0a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4z" />
+    </svg>
+  );
+
+  const WishlistIcon = ({ isInWishlist }) => (
+    <svg className="w-5 h-5" fill={isInWishlist ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+    </svg>
+  );
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6 p-1 sm:p-4">
+      {products.map((product) => (
+        <Link
+          key={product.id}
+          href={`/product/${product.id}`}
+          className="w-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300 block"
+          onMouseEnter={() => setHoveredProduct(product.id)}
+          onMouseLeave={() => setHoveredProduct(null)}
+        >
+          {/* Product Image */}
+          <div className="relative aspect-square overflow-hidden bg-gray-100">
+            <Image
+              src={product.image}
+              alt={product.name}
+              fill
+              className="object-cover transition-transform duration-300 hover:scale-105"
+            />
+            
+            {/* Discount Badge */}
+            {product.discount && (
+              <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                -{product.discount}%
+              </div>
+            )}
+
+            {/* Action Icons - Desktop: Show on hover, Mobile: Always show */}
+            <ClientOnly>
+              <div className={`absolute top-2 right-2 flex flex-col gap-2 transition-opacity duration-300 ${
+                hoveredProduct === product.id ? 'opacity-100' : 'opacity-100 md:opacity-0'
+              }`}>
+                <button 
+                  onClick={(e) => handleWishlistClick(e, product)}
+                  className={`bg-white/90 hover:bg-white p-2 rounded-full shadow-sm transition-colors duration-200 ${
+                    isInWishlist(product.id.toString()) 
+                      ? 'text-red-500 hover:text-red-600' 
+                      : 'text-gray-700 hover:text-red-500'
+                  }`}
+                >
+                  <WishlistIcon isInWishlist={isInWishlist(product.id.toString())} />
+                </button>
+                <button 
+                  onClick={(e) => handleAddToCart(e, product)}
+                  className="bg-white/90 hover:bg-white text-gray-700 hover:text-blue-600 p-2 rounded-full shadow-sm transition-colors duration-200"
+                >
+                  <CartIcon />
+                </button>
+              </div>
+            </ClientOnly>
+          </div>
+
+          {/* Product Info */}
+          <div className="p-3">
+            {/* Product Name */}
+            <h3 className="font-medium text-gray-800 text-sm mb-2 line-clamp-2 tracking-[-.01em]">
+              {product.name}
+            </h3>
+
+            {/* Rating */}
+            <div className="flex items-center gap-1 mb-2">
+              <div className="flex items-center">
+                {renderStars(productRatings[product.id]?.averageRating || product.rating || 0)}
+              </div>
+              <span className="text-xs text-gray-500 ml-1">
+                ({productRatings[product.id]?.reviewCount || product.reviews || 0})
+              </span>
+            </div>
+
+            {/* Price */}
+            <div className="flex items-center justify-between">
+              {product.originalPrice && (
+                <span className="text-xs text-gray-500 line-through">
+                  ₹{product.originalPrice}
+                </span>
+              )}
+              <span className="font-bold text-gray-900 text-sm">
+                ₹{product.price}
+              </span>
+            </div>
+          </div>
+        </Link>
+      ))}
+      
+    </div>
+  );
+}
