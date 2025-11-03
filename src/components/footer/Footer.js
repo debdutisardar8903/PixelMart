@@ -33,16 +33,16 @@ export default function Footer() {
             
             {/* Additional Links */}
             <div className="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-2 text-sm">
-              <Link href="/contact" className="text-gray-400 hover:text-white transition-colors duration-200">
+              <Link href="/help" className="text-gray-400 hover:text-white transition-colors duration-200">
                 Contact Us
               </Link>
-              <Link href="/refund-policy" className="text-gray-400 hover:text-white transition-colors duration-200">
+              <Link href="/profile/privacy?section=refund-policy" className="text-gray-400 hover:text-white transition-colors duration-200">
                 Refunds & Cancellations
               </Link>
-              <Link href="/privacy-policy" className="text-gray-400 hover:text-white transition-colors duration-200">
+              <Link href="/profile/privacy?section=privacy-policy" className="text-gray-400 hover:text-white transition-colors duration-200">
                 Privacy
               </Link>
-              <Link href="/terms-of-service" className="text-gray-400 hover:text-white transition-colors duration-200">
+              <Link href="/profile/privacy?section=terms-conditions" className="text-gray-400 hover:text-white transition-colors duration-200">
                 Terms
               </Link>
               <Link href="/sitemap" className="text-gray-400 hover:text-white transition-colors duration-200">

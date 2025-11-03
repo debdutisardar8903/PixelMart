@@ -9,6 +9,7 @@ import { useCart } from '@/components/contexts/CartContext';
 import { useWishlist } from '@/components/contexts/WishlistContext';
 
 export default function Header() {
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isCategoriesMenuOpen, setIsCategoriesMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -74,8 +75,8 @@ export default function Header() {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Navigate to search results page or handle search
-      console.log('Searching for:', searchQuery);
+      // Navigate to search results page
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setIsSearchOpen(false);
       setSearchQuery('');
     }

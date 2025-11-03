@@ -323,7 +323,27 @@ export default function ProductDetails() {
               </li>
               <li>/</li>
               <li>
-                <span className="text-gray-400">{product.category}</span>
+                <button 
+                  onClick={() => {
+                    const category = product.category?.toLowerCase();
+                    // Map categories to their respective pages
+                    const categoryRoutes = {
+                      'ebooks': '/ebooks',
+                      'courses': '/courses',
+                      'templates': '/templates',
+                      'digital-tools': '/digital-tools',
+                      'music-audio': '/music-audio',
+                      'graphics-design': '/graphics-design'
+                    };
+                    
+                    // Navigate to specific category page or general categories page
+                    const route = categoryRoutes[category] || '/categories';
+                    router.push(route);
+                  }}
+                  className="text-gray-400 hover:text-gray-900 transition-colors duration-200"
+                >
+                  {product.category}
+                </button>
               </li>
               <li>/</li>
               <li>

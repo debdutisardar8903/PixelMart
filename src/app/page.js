@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { ref, get } from 'firebase/database';
 import { database } from '@/lib/firebase';
 import ProductGrid from '@/components/ProductGrid';
@@ -11,6 +12,7 @@ import BottomNav from '@/components/bottomnav/BottomNav';
 import ClientOnly from '@/components/ClientOnly';
 
 export default function Home() {
+  const router = useRouter();
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [displayedProducts, setDisplayedProducts] = useState([]);
@@ -280,10 +282,10 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {/* Reels Bundle */}
-            <div className="group cursor-pointer">
+            <div className="group cursor-pointer" onClick={() => router.push('/categories')}>
               <div className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-purple-400 to-pink-400 mb-3">
                 <Image
-                  src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=400&fit=crop"
+                  src="/category/reels-bundle.png"
                   alt="Reels Bundle"
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-300"
@@ -302,14 +304,13 @@ export default function Home() {
                 Reels Bundle
               </h3>
               <p className="text-sm text-gray-600">Social media content</p>
-              <p className="text-xs text-gray-500 mt-1">24 products</p>
             </div>
 
             {/* E-books */}
-            <div className="group cursor-pointer">
+            <div className="group cursor-pointer" onClick={() => router.push('/ebooks')}>
               <div className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-blue-400 to-indigo-400 mb-3">
                 <Image
-                  src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=400&fit=crop"
+                  src="/category/eBooks.png"
                   alt="E-books"
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-300"
@@ -328,14 +329,13 @@ export default function Home() {
                 E-books
               </h3>
               <p className="text-sm text-gray-600">Digital publications</p>
-              <p className="text-xs text-gray-500 mt-1">18 products</p>
             </div>
 
             {/* WP Themes */}
-            <div className="group cursor-pointer">
+            <div className="group cursor-pointer" onClick={() => router.push('/templates')}>
               <div className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-green-400 to-emerald-400 mb-3">
                 <Image
-                  src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=400&fit=crop"
+                  src="/category/WP-Themes.png"
                   alt="WP Themes"
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-300"
@@ -354,14 +354,13 @@ export default function Home() {
                 WP Themes
               </h3>
               <p className="text-sm text-gray-600">WordPress templates</p>
-              <p className="text-xs text-gray-500 mt-1">32 products</p>
             </div>
 
             {/* Digital Tools */}
-            <div className="group cursor-pointer">
+            <div className="group cursor-pointer" onClick={() => router.push('/digital-tools')}>
               <div className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-orange-400 to-red-400 mb-3">
                 <Image
-                  src="https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=400&h=400&fit=crop"
+                  src="/category/Digital-tools.png"
                   alt="Digital Tools"
                   fill
                   className="object-cover group-hover:scale-110 transition-transform duration-300"
@@ -380,7 +379,6 @@ export default function Home() {
                 Digital Tools
               </h3>
               <p className="text-sm text-gray-600">Software & utilities</p>
-              <p className="text-xs text-gray-500 mt-1">15 products</p>
             </div>
           </div>
         </div>

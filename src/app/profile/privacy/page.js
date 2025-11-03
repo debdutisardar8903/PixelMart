@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/header/Header';
 import Footer from '@/components/footer/Footer';
 import BottomNav from '@/components/bottomnav/BottomNav';
 import { useAuth } from '@/components/contexts/AuthContext';
 
-export default function PrivacyCenterPage() {
+function PrivacyCenterPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [selectedPolicy, setSelectedPolicy] = useState(null);
   const [expandedFAQ, setExpandedFAQ] = useState(null);
@@ -604,6 +605,17 @@ export default function PrivacyCenterPage() {
     setSelectedPolicy(null);
   };
 
+  // Handle URL parameters to show specific sections
+  useEffect(() => {
+    const section = searchParams.get('section');
+    if (section) {
+      const policy = privacyOptions.find(option => option.id === section);
+      if (policy) {
+        setSelectedPolicy(policy);
+      }
+    }
+  }, [searchParams]);
+
   // FAQ data
   const faqData = [
     {
@@ -876,5 +888,57 @@ export default function PrivacyCenterPage() {
       {/* Bottom Navigation */}
       <BottomNav />
     </div>
+  );
+}
+
+// Loading component for Suspense fallback
+function PrivacyCenterPageLoading() {
+  return (
+    <div className="font-sans min-h-screen bg-white flex flex-col">
+      <div className="hidden sm:block">
+        <Header />
+      </div>
+      
+      <div className="flex-1 pt-6 sm:pt-24 px-4">
+        <div className="mx-auto max-w-6xl">
+          {/* Back Button - Mobile Only */}
+          <div className="mb-4 sm:hidden">
+            <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
+          </div>
+
+          {/* Page Header Loading */}
+          <div className="mb-8 text-center">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto mb-4 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto animate-pulse"></div>
+          </div>
+
+          {/* Privacy Options Grid Loading */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+                <div className="h-16 bg-gray-200"></div>
+                <div className="p-4">
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-16">
+        <Footer />
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
+export default function PrivacyCenterPage() {
+  return (
+    <Suspense fallback={<PrivacyCenterPageLoading />}>
+      <PrivacyCenterPageContent />
+    </Suspense>
   );
 }
