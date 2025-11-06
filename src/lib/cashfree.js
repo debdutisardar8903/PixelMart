@@ -13,7 +13,7 @@ const getBackendUrl = () => {
   if (process.env.NODE_ENV === 'development') {
     return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
   }
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'wallineex-backend-production.up.railway.app';
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'https://wallineex-backend.onrender.com';
 };
 
 // Get frontend URL from environment
